@@ -261,44 +261,40 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
-    // Storage keys
+    //======================================================================
+    // تم إضافة هذه الأسطر الجديدة لتهيئة Supabase
+    // يرجى استبدال هذه القيم ببيانات مشروعك
+    //======================================================================
+  const SUPABASE_URL = 'https://muwylrqdcrzggqbxhmoq.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im11d3lscnFkY3J6Z2dxYnhobW9xIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU2NjUzOTcsImV4cCI6MjA3MTI0MTM5N30.vO-mMw4TULYO62dNgw_lRe8NoMd9SW6SDOwjr5r83Zo';
+
+    const supabase = Supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // Storage keys (لم تعد تستخدم)
     const LS_CATALOG = 'horipy_catalog_v1';
     const LS_ORDERS = 'horipy_orders_v1';
     const LS_ADMIN = 'horipy_admin_v1';
 
-    // Default catalog
+    // Default catalog (لم تعد تستخدم)
     const defaultCatalog = {
-      categories:[
-        {id:'engine',name:'المحرك'},
-        {id:'elect',name:'الكهرباء'},
-        {id:'brake',name:'الفرامل'},
-        {id:'oil_tires',name:'الزيوت - الإطارات'},
-        {id:'body',name:'الهيكل'},
-        {id:'access',name:'الإكسسوار'},
-      ],
-      items:[
-        {id:uid(),cat:'engine',name:'بستون حراري',desc:'بستون حرارة عالية',price:'150',img:'',stock:999},
-        {id:uid(),cat:'engine',name:'جيرات مكينة',desc:'عدة جيرات للمكينة',price:'80',img:'',stock:50},
-        {id:uid(),cat:'elect',name:'بطاريات صم نيزك',desc:'بطارية قوية',price:'200',img:'',stock:120},
-        {id:uid(),cat:'brake',name:'فحمات - كنيوسات',desc:'فحمات وكنيوسات للفرامل',price:'50',img:'',stock:200},
-        {id:uid(),cat:'oil_tires',name:'زيت كره حراري',desc:'زيت لكرة حرارية',price:'30',img:'',stock:300},
-        {id:uid(),cat:'access',name:'كشافات نيزك',desc:'كشاف إضاءة',price:'110',img:'',stock:60},
-        {id:uid(),cat:'body',name:'هاندل - تعاشيق',desc:'هاندل وتعاشيق',price:'75',img:'',stock:40},
-      ]
+      categories:[],
+      items:[]
     };
 
     // utils
     function uid(){return 'id'+Math.random().toString(36).slice(2,9)}
-    function saveCatalog(c){ localStorage.setItem(LS_CATALOG, JSON.stringify(c)); }
-    function loadCatalog(){ const r = localStorage.getItem(LS_CATALOG); return r? JSON.parse(r) : JSON.parse(JSON.stringify(defaultCatalog)); }
-    function saveOrders(o){ localStorage.setItem(LS_ORDERS, JSON.stringify(o)); }
-    function loadOrders(){ const r = localStorage.getItem(LS_ORDERS); return r? JSON.parse(r) : []; }
-    function loadAdmin(){ const r=localStorage.getItem(LS_ADMIN); return r? JSON.parse(r) : {user:'admin',pass:'213626'} }
+    // لم تعد وظائف التخزين المحلي هذه تُستخدم
+    // function saveCatalog(c){ localStorage.setItem(LS_CATALOG, JSON.stringify(c)); }
+    // function loadCatalog(){ const r = localStorage.getItem(LS_CATALOG); return r? JSON.parse(r) : JSON.parse(JSON.stringify(defaultCatalog)); }
+    // function saveOrders(o){ localStorage.setItem(LS_ORDERS, JSON.stringify(o)); }
+    // function loadOrders(){ const r = localStorage.getItem(LS_ORDERS); return r? JSON.parse(r) : []; }
+    // function loadAdmin(){ const r=localStorage.getItem(LS_ADMIN); return r? JSON.parse(r) : {user:'admin',pass:'213626'} }
 
     // state
-    let catalog = loadCatalog();
-    let orders = loadOrders();
+    let catalog = { categories: [], items: [] };
+    let orders = [];
     let currentCat = null;
     let cart = [];
 
@@ -347,13 +343,38 @@
     const orderList = document.getElementById('orderList');
     const ordersCount = document.getElementById('ordersCount');
 
+    //======================================================================
+    // تم تعديل وظائف جلب البيانات من Supabase
+    //======================================================================
+    async function fetchCatalog() {
+      const { data: categories, error: catError } = await supabase.from('categories').select('*');
+      const { data: items, error: itemError } = await supabase.from('items').select('*');
+      if (catError || itemError) {
+        console.error('Error fetching catalog:', catError || itemError);
+        return { categories: [], items: [] };
+      }
+      return { categories, items };
+    }
+
+    async function fetchOrders() {
+      const { data, error } = await supabase.from('orders').select('*');
+      if (error) {
+        console.error('Error fetching orders:', error);
+        return [];
+      }
+      return data;
+    }
+
     // render categories sidebar (main UI)
-    function renderCategories(filter='') {
+    async function renderCategories(filter='') {
+      const { categories } = await fetchCatalog();
+      catalog.categories = categories;
+
       categoriesList.innerHTML = '';
       const allBtn = document.createElement('div');
       allBtn.className = 'category' + (currentCat===null ? ' active' : '');
       allBtn.textContent = 'كل الأقسام';
-      allBtn.onclick = ()=>{ currentCat=null; renderItems(); renderCategories(); };
+      allBtn.onclick = async ()=>{ currentCat=null; await renderItems(); renderCategories(); };
       categoriesList.appendChild(allBtn);
 
       catalog.categories.forEach(c=>{
@@ -361,23 +382,26 @@
         const d = document.createElement('div');
         d.className = 'category' + (currentCat===c.id ? ' active' : '');
         d.textContent = c.name;
-        d.onclick = ()=>{ currentCat = c.id; renderItems(); renderCategories(); };
+        d.onclick = async ()=>{ currentCat = c.id; await renderItems(); renderCategories(); };
         categoriesList.appendChild(d);
       });
     }
 
     // render items grid (main UI)
-    function renderItems() {
+    async function renderItems() {
+      const { items } = await fetchCatalog();
+      catalog.items = items;
+
       itemsWrap.innerHTML = '';
       const searchQ = document.getElementById('search').value.trim();
       let found = 0;
-      const items = catalog.items.filter(it=>{
+      const filteredItems = catalog.items.filter(it=>{
         if(currentCat && it.cat !== currentCat) return false;
         if(searchQ){ const q = searchQ.toLowerCase(); return (it.name||'').toLowerCase().includes(q) || (it.desc||'').toLowerCase().includes(q); }
         return true;
       });
 
-      items.forEach(it=>{
+      filteredItems.forEach(it=>{
         found++;
         const card = document.createElement('div'); card.className='card';
         const img = document.createElement('img'); img.src = it.img || 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200"><rect width="100%" height="100%" fill="%23fafafa"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="%236b6b6b" font-size="16">صورة غير متوفرة</text></svg>';
@@ -401,7 +425,7 @@
           const editBtn = document.createElement('button'); editBtn.className='btn ghost'; editBtn.textContent='تعديل';
           editBtn.onclick = ()=>{ openItemModalForEdit(it.id); };
           const delBtn = document.createElement('button'); delBtn.className='btn ghost'; delBtn.textContent='حذف';
-          delBtn.onclick = ()=>{ if(confirm('حذف الصنف؟')){ catalog.items = catalog.items.filter(x=>x.id!==it.id); saveCatalog(catalog); renderItems(); populateAdmin(); } };
+          delBtn.onclick = async ()=>{ if(confirm('حذف الصنف؟')){ await deleteItem(it.id); } };
           adminControls.appendChild(editBtn); adminControls.appendChild(delBtn);
           card.appendChild(adminControls);
         }
@@ -485,15 +509,30 @@
     }
 
     // order actions (buttons)
-    document.getElementById('btnSaveOrder').onclick = ()=>{
+    //======================================================================
+    // تم تعديل وظيفة حفظ الطلب لحفظه في Supabase
+    //======================================================================
+    document.getElementById('btnSaveOrder').onclick = async ()=>{
       const name = document.getElementById('clientName').value.trim();
       const shop = document.getElementById('shopName').value.trim();
       const address = document.getElementById('address').value.trim();
       const phone = document.getElementById('phone').value.trim();
       if(!shop){ alert('يرجى إدخال اسم المحل (الحقل الإلزامي)'); return; }
       if(cart.length===0){ alert('السلة فارغة'); return; }
-      const order = { id: uid(), date: new Date().toLocaleString('ar-EG'), name, shop, address, phone, items: cart.slice() };
-      orders.push(order); saveOrders(orders); cart=[]; renderOrder(); updateOrdersCount(); alert('تم حفظ الطلب بنجاح');
+
+      const order = { name, shop, address, phone, items: cart.slice() };
+      const { data, error } = await supabase.from('orders').insert([order]);
+      
+      if(error){
+        console.error('Error saving order:', error);
+        alert('حدث خطأ أثناء حفظ الطلب. يرجى المحاولة مرة أخرى.');
+      } else {
+        orders.push(order);
+        cart=[];
+        renderOrder();
+        await updateOrdersCount();
+        alert('تم حفظ الطلب بنجاح');
+      }
     };
 
     document.getElementById('btnDownloadCSV').onclick = ()=>{
@@ -583,25 +622,43 @@
     }
     adminCloseBtn.addEventListener('click', ()=>{ adminModal.style.display='none'; });
 
-    btnLoginAdmin.addEventListener('click', ()=>{ loginAdmin(); });
+    //======================================================================
+    // تم تعديل وظيفة تسجيل الدخول
+    //======================================================================
+    btnLoginAdmin.addEventListener('click', async ()=>{ await loginAdmin(); });
     btnLogout.addEventListener('click', ()=>{ loginBox.style.display='block'; controlPanel.style.display='none'; adminLogged=false; renderItems(); });
 
-    function loginAdmin(){
+    async function loginAdmin(){
       const u = document.getElementById('adminUser').value;
       const p = document.getElementById('adminPass').value;
-      const admin = loadAdmin();
-      if(u===admin.user && p===admin.pass){
+      
+      const { data, error } = await supabase
+        .from('admins')
+        .select('*')
+        .eq('user', u)
+        .eq('pass', p);
+        
+      if(error || !data || data.length === 0){
+        alert('بيانات دخول خاطئة');
+      } else {
         adminLogged = true;
         loginBox.style.display = 'none';
         controlPanel.style.display = 'block';
-        populateAdmin();
-      } else {
-        alert('بيانات دخول خاطئة');
+        await populateAdmin();
       }
     }
 
     // Populate admin panel lists
-    function populateAdmin(){
+    //======================================================================
+    // تم تحديث هذه الوظيفة لجلب البيانات من Supabase
+    //======================================================================
+    async function populateAdmin(){
+      const { categories, items } = await fetchCatalog();
+      orders = await fetchOrders();
+
+      catalog.categories = categories;
+      catalog.items = items;
+
       // categories
       adminCategories.innerHTML = '';
       selectCatForItem.innerHTML = '';
@@ -612,7 +669,7 @@
         const editBtn = document.createElement('button'); editBtn.className='small-btn edit'; editBtn.textContent='✏'; editBtn.title='تعديل التصنيف';
         editBtn.onclick = ()=>{ openCategoryModal('edit', cat.id); };
         const delBtn = document.createElement('button'); delBtn.className='small-btn del'; delBtn.textContent='🗑'; delBtn.title='حذف التصنيف';
-        delBtn.onclick = ()=>{ if(confirm('حذف التصنيف سيحذف الأصناف التابعة له. متابعة؟')){ deleteCategory(cat.id); } };
+        delBtn.onclick = async ()=>{ if(confirm('حذف التصنيف سيحذف الأصناف التابعة له. متابعة؟')){ await deleteCategory(cat.id); } };
         right.appendChild(editBtn); right.appendChild(delBtn);
         row.appendChild(left); row.appendChild(right);
         adminCategories.appendChild(row);
@@ -626,7 +683,7 @@
 
       // orders
       renderSavedOrdersAdmin();
-      updateOrdersCount();
+      await updateOrdersCount();
       renderItems(); // to show admin controls on cards
     }
 
@@ -642,7 +699,7 @@
           left.appendChild(thumb); left.appendChild(txt);
           const right = document.createElement('div');
           const editBtn = document.createElement('button'); editBtn.className='small-btn edit'; editBtn.textContent='تعديل'; editBtn.onclick = ()=>{ openItemModalForEdit(it.id); };
-          const delBtn = document.createElement('button'); delBtn.className='small-btn del'; delBtn.textContent='حذف'; delBtn.onclick = ()=>{ if(confirm('حذف الصنف؟')){ catalog.items = catalog.items.filter(x=>x.id!==it.id); saveCatalog(catalog); renderItems(); populateAdmin(); } };
+          const delBtn = document.createElement('button'); delBtn.className='small-btn del'; delBtn.textContent='حذف'; delBtn.onclick = async ()=>{ if(confirm('حذف الصنف؟')){ await deleteItem(it.id); } };
           right.appendChild(editBtn); right.appendChild(delBtn);
           div.appendChild(left); div.appendChild(right);
           adminItems.appendChild(div);
@@ -657,13 +714,13 @@
         const d = document.createElement('div'); d.style.border='1px solid #eee'; d.style.padding='8px'; d.style.marginTop='6px';
         d.innerHTML = `<b>${o.shop}</b> <div class="small">${o.date} - ${o.name||''} - ${o.phone||''}</div>`;
         const view = document.createElement('button'); view.className='small-btn'; view.textContent='عرض'; view.onclick = ()=>{ alert(formatOrderForDisplay(o)); };
-        const del = document.createElement('button'); del.className='small-btn del'; del.textContent='حذف'; del.onclick = ()=>{ if(confirm('حذف الطلب؟')){ orders = orders.filter(x=>x.id!==o.id); saveOrders(orders); populateAdmin(); } };
+        const del = document.createElement('button'); del.className='small-btn del'; del.textContent='حذف'; del.onclick = async ()=>{ if(confirm('حذف الطلب؟')){ await deleteOrder(o.id); } };
         d.appendChild(view); d.appendChild(del);
         savedOrdersAdmin.appendChild(d);
       });
     }
     function formatOrderForDisplay(o){ 
-        let text = `اسم المحل: ${o.shop}\nالتاريخ: ${o.date}\nالاسم: ${o.name||''}\nالهاتف: ${o.phone||''}\nالعنوان: ${o.address||''}\n\nالأصناف:\n`;
+        let text = `اسم المحل: ${o.shop}\nالتاريخ: ${o.created_at ? new Date(o.created_at).toLocaleString('ar-EG') : 'غير متوفر'}\nالاسم: ${o.name||''}\nالهاتف: ${o.phone||''}\nالعنوان: ${o.address||''}\n\nالأصناف:\n`;
         let totalValue = 0;
         o.items.forEach(it => {
             const itemValue = parseFloat(it.price || 0) * it.qty;
@@ -674,13 +731,24 @@
         return text;
     }
     
-    function updateOrdersCount(){
-      ordersCount.textContent = `${orders.length} طلب محفوظ`;
+    //======================================================================
+    // تم تحديث وظيفة عد الطلبات لجلبها من Supabase
+    //======================================================================
+    async function updateOrdersCount(){
+      const { count, error } = await supabase.from('orders').select('*', { count: 'exact' });
+      if(error){
+        console.error('Error counting orders:', error);
+      } else {
+        ordersCount.textContent = `${count} طلب محفوظ`;
+      }
     }
     
     // Add / Edit Categories Logic
     addCategoryBtn.addEventListener('click', ()=>{ openCategoryModal('add'); });
-    saveCategoryBtn.addEventListener('click', saveCategory);
+    //======================================================================
+    // تم تعديل وظيفة حفظ التصنيف
+    //======================================================================
+    saveCategoryBtn.addEventListener('click', async ()=>{ await saveCategory(); });
 
     function openCategoryModal(mode, catId = null){
       categoryModal.style.display = 'flex';
@@ -695,44 +763,63 @@
       }
     }
 
-    function saveCategory(){
+    async function saveCategory(){
       const newName = categoryModalName.value.trim();
       if(!newName) {
         alert('اسم التصنيف لا يمكن أن يكون فارغاً.');
         return;
       }
       
+      let res;
       if (editingCategoryId) { // edit mode
-        const cat = catalog.categories.find(c => c.id === editingCategoryId);
-        if(cat) cat.name = newName;
+        res = await supabase.from('categories').update({ name: newName }).eq('id', editingCategoryId);
       } else { // add mode
-        catalog.categories.push({ id: uid(), name: newName });
+        res = await supabase.from('categories').insert({ name: newName });
       }
-      saveCatalog(catalog);
-      populateAdmin();
-      renderCategories();
-      categoryModal.style.display = 'none';
-      alert('تم حفظ التصنيف بنجاح!');
+
+      if(res.error){
+        console.error('Error saving category:', res.error);
+        alert('حدث خطأ أثناء حفظ التصنيف.');
+      } else {
+        await populateAdmin();
+        renderCategories();
+        categoryModal.style.display = 'none';
+        alert('تم حفظ التصنيف بنجاح!');
+      }
     }
 
-    function deleteCategory(catId){
-      catalog.categories = catalog.categories.filter(c => c.id !== catId);
-      catalog.items = catalog.items.filter(it => it.cat !== catId);
-      saveCatalog(catalog);
-      populateAdmin();
-      renderCategories();
-      renderItems();
-      alert('تم حذف التصنيف والأصناف التابعة له بنجاح.');
+    //======================================================================
+    // تم تعديل وظيفة حذف التصنيف
+    //======================================================================
+    async function deleteCategory(catId){
+      const { error: itemError } = await supabase.from('items').delete().eq('cat', catId);
+      const { error: catError } = await supabase.from('categories').delete().eq('id', catId);
+
+      if(catError || itemError){
+        console.error('Error deleting category or items:', catError || itemError);
+        alert('حدث خطأ أثناء الحذف.');
+      } else {
+        await populateAdmin();
+        await renderCategories();
+        await renderItems();
+        alert('تم حذف التصنيف والأصناف التابعة له بنجاح.');
+      }
     }
     
     // Add / Edit Items Logic
     openAddItemBtn.addEventListener('click', ()=>{ openItemModal('add'); });
-    saveItemBtn.addEventListener('click', saveItem);
+    //======================================================================
+    // تم تعديل وظيفة حفظ الصنف
+    //======================================================================
+    saveItemBtn.addEventListener('click', async ()=>{ await saveItem(); });
 
-    function openItemModal(mode, itemId = null){
+    async function openItemModal(mode, itemId = null){
       itemModal.style.display = 'flex';
       editingItemId = itemId;
       
+      const { categories } = await fetchCatalog();
+      catalog.categories = categories;
+
       // populate categories select
       itemModalCategory.innerHTML = '';
       catalog.categories.forEach(cat=>{
@@ -783,46 +870,74 @@
         });
       }
       
-      if(editingItemId){ // edit mode
-        const item = catalog.items.find(i => i.id === editingItemId);
-        if(item){
-          item.name = name;
-          item.cat = cat;
-          item.desc = desc;
-          item.price = price;
-          if(imgData) item.img = imgData;
-        }
-      } else { // add mode
-        const newItem = { id:uid(), cat, name, desc, price, img: imgData || '', stock: 999 };
-        catalog.items.push(newItem);
-      }
+      let itemPayload = { cat, name, desc, price, img: imgData || '', stock: 999 };
+      let res;
       
-      saveCatalog(catalog);
-      populateAdmin();
-      itemModal.style.display = 'none';
-      alert('تم حفظ الصنف بنجاح!');
+      if(editingItemId){ // edit mode
+        res = await supabase.from('items').update(itemPayload).eq('id', editingItemId);
+      } else { // add mode
+        res = await supabase.from('items').insert([itemPayload]);
+      }
+
+      if(res.error){
+        console.error('Error saving item:', res.error);
+        alert('حدث خطأ أثناء حفظ الصنف.');
+      } else {
+        await populateAdmin();
+        itemModal.style.display = 'none';
+        alert('تم حفظ الصنف بنجاح!');
+      }
     }
 
     function openItemModalForEdit(itemId){
         openItemModal('edit', itemId);
     }
     
-    function deleteItem(itemId){
-      catalog.items = catalog.items.filter(x=>x.id!==itemId);
-      saveCatalog(catalog);
-      renderItems();
-      populateAdmin();
-      alert('تم حذف الصنف بنجاح.');
+    //======================================================================
+    // تم تعديل وظيفة حذف الصنف
+    //======================================================================
+    async function deleteItem(itemId){
+      const { error } = await supabase.from('items').delete().eq('id', itemId);
+
+      if(error){
+        console.error('Error deleting item:', error);
+        alert('حدث خطأ أثناء الحذف.');
+      } else {
+        await renderItems();
+        await populateAdmin();
+        alert('تم حذف الصنف بنجاح.');
+      }
+    }
+
+    //======================================================================
+    // وظيفة حذف الطلبات المحفوظة
+    //======================================================================
+    async function deleteOrder(orderId){
+      const { error } = await supabase.from('orders').delete().eq('id', orderId);
+      if(error){
+        console.error('Error deleting order:', error);
+        alert('حدث خطأ أثناء حذف الطلب.');
+      } else {
+        await populateAdmin();
+        alert('تم حذف الطلب بنجاح.');
+      }
     }
 
     // Initial rendering
     document.getElementById('search').addEventListener('keyup', renderItems);
     document.getElementById('btnClear').addEventListener('click', ()=>{ cart=[]; renderOrder(); });
     
-    renderCategories();
-    renderItems();
-    renderOrder();
-    updateOrdersCount();
+    //======================================================================
+    // تم تحديث وظائف التهيئة الأولية
+    //======================================================================
+    async function initializeApp(){
+      await renderCategories();
+      await renderItems();
+      renderOrder();
+      await updateOrdersCount();
+    }
+    
+    initializeApp();
   </script>
 </body>
 </html>
